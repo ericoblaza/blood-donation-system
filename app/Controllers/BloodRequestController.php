@@ -6,7 +6,6 @@ namespace App\Controllers;
 
 use App\Contracts\BloodRequestRepositoryInterface;
 use App\Models\BloodRequestResponse;
-use Core\Auth;
 use Core\Http\Request;
 use Core\Http\Response;
 use Core\View\Engine;
@@ -20,8 +19,6 @@ class BloodRequestController
 
     public function requesterResponses(Request $request): void
 {
-    Auth::requireUser();
-
     $requesterUserId = (int) ($_SESSION['user']['id'] ?? 0);
 
     $responses = BloodRequestResponse::findForRequester($requesterUserId);
@@ -32,8 +29,6 @@ class BloodRequestController
 
     public function history(Request $request): void
 {
-    Auth::requireUser();
-
     $userId = (int) ($_SESSION['user']['id'] ?? 0);
 
     $requests = $this->bloodRequests->findAllByRequester($userId);
@@ -43,8 +38,6 @@ class BloodRequestController
 
     public function show(Request $request): void
     {
-        Auth::requireUser();
-
         $id = (int) ($request->route('id') ?? '0');
         if ($id < 1) {
             (new Response())->redirect(app_url('/requests'));
@@ -64,8 +57,6 @@ class BloodRequestController
 
     public function index(Request $request): void
     {
-        Auth::requireUser();
-    
         $requests = $this->bloodRequests->findAllOpen();
     
         $currentUserId = (int) ($_SESSION['user']['id'] ?? 0);
@@ -80,8 +71,6 @@ class BloodRequestController
 
     public function showCreate(Request $request): void
     {
-        Auth::requireUser();
-
         $errors = [];
         $old = [
             'blood_type' => '',
@@ -97,8 +86,6 @@ class BloodRequestController
 
     public function store(Request $request): void
     {
-        Auth::requireUser();
-
         [$errors, $old] = $this->validatedRequestInput($request);
 
         if ($errors !== []) {
@@ -133,8 +120,6 @@ class BloodRequestController
 
     private function saveDecision(Request $request, string $decision): void
     {
-        Auth::requireUser();
-    
         $requestId = (int) $request->input('request_id', 0);
         $donorUserId = (int) ($_SESSION['user']['id'] ?? 0);
     
@@ -174,8 +159,6 @@ class BloodRequestController
 
     public function showEdit(Request $request): void
     {
-        Auth::requireUser();
-
         $bloodRequest = $this->findOwnedOpenRequest($request);
         if ($bloodRequest === null) {
             return;
@@ -200,8 +183,6 @@ class BloodRequestController
 
     public function update(Request $request): void
     {
-        Auth::requireUser();
-
         $bloodRequest = $this->findOwnedOpenRequest($request);
         if ($bloodRequest === null) {
             return;
@@ -235,8 +216,6 @@ class BloodRequestController
 
     public function destroy(Request $request): void
     {
-        Auth::requireUser();
-
         $bloodRequest = $this->findOwnedOpenRequest($request);
         if ($bloodRequest === null) {
             return;

@@ -57,8 +57,9 @@
 - Like a mail sorter who reads an address and delivers it to the right person
 
 **Key Methods:**
-- `get()`, `post()` - Register a URL pattern that the app understands
-- `dispatch()` - Take an incoming request and find its matching handler
+- `get()`, `post()` - Register a URL pattern (optional 3rd argument: middleware classes)
+- `dispatch()` - Match route, run **middleware pipeline**, then controller
+- `runPipeline()` - Chain middleware before the handler runs
 - `resolve()` - Extract the values from the URL (like {id})
 - `normalizePath()` - Clean up the path so `/requests` and `/requests/` are treated the same
 
@@ -125,16 +126,15 @@ Response = what the server sends back
 
 ---
 
-#### 7. **core/Auth.php** - Authentication Guard
+#### 7. **core/Auth.php** - Authentication Helper
 **Purpose:**
-- Checks if a user is logged in or not
-- Protects pages that require login
-- Redirects unauthorized users to the login page
-- Like a security guard checking if you have a ticket before letting you into an event
+- Session helpers used by **AuthMiddleware** and login logic
+- `check()` — is `$_SESSION['user']` set?
+- `requireUser()` — redirect guests to `/login` (called from middleware, not controllers)
 
 **Key Methods:**
 - `check()` - Is a user currently logged in?
-- `requireUser()` - Make sure the user is logged in, otherwise redirect to login
+- `requireUser()` - Redirect to login if guest (used by `AuthMiddleware`)
 
 ---
 
@@ -254,11 +254,41 @@ Response = what the server sends back
 - `findOwnedOpenRequest()` - Security check for ownership and status
 - `validatedRequestInput()` - Validates blood type, city, units, contact info
 
+**Note:** Login protection is handled by **middleware** on routes, not `Auth::requireUser()` inside these controllers.
+
+---
+
+### Application Middleware
+
+#### 14. **app/Middleware/MiddlewareInterface.php** - Middleware Contract
+**Purpose:**
+- Defines the rule every middleware must follow
+- One method: `handle(Request $request, callable $next)`
+
+**Why it exists:**
+- Router can run any class that implements this interface (Open/Closed Principle)
+- Same pattern as Laravel-style middleware
+
+---
+
+#### 15. **app/Middleware/AuthMiddleware.php** - Auth Middleware
+**Purpose:**
+- Runs **before** protected controllers
+- Calls `Auth::requireUser()` — guest → redirect login; logged in → `$next($request)` continues to controller
+
+**Used on routes in `routes/web.php`:**
+```php
+$auth = [AuthMiddleware::class];
+$router->get('/dashboard', [HomeController::class, 'dashboard'], $auth);
+```
+
+**Public routes (no middleware):** `/`, `/login`, `/register`
+
 ---
 
 ### Application Models
 
-#### 14. **app/Models/User.php** - User Model (Eloquent ORM)
+#### 16. **app/Models/User.php** - User Model (Eloquent ORM)
 **Purpose:**
 - Maps to `users` table
 - User lookup and registration via ORM (no hand-written SQL)
@@ -272,7 +302,7 @@ Response = what the server sends back
 
 ---
 
-#### 15. **app/Models/BloodRequest.php** - Blood Request Model (Eloquent ORM)
+#### 17. **app/Models/BloodRequest.php** - Blood Request Model (Eloquent ORM)
 **Purpose:**
 - Maps to `blood_requests` table
 - CRUD + status updates via query builder / Eloquent
@@ -287,7 +317,7 @@ Response = what the server sends back
 
 ---
 
-#### 16. **app/Models/BloodRequestResponse.php** - Response Model (Eloquent ORM)
+#### 18. **app/Models/BloodRequestResponse.php** - Response Model (Eloquent ORM)
 **Purpose:**
 - Maps to `blood_request_responses` (composite key: `request_id` + `donor_user_id`)
 - Donor accept/decline tracking
@@ -305,7 +335,7 @@ Response = what the server sends back
 
 ### Application Contracts/Interfaces
 
-#### 17. **app/Contracts/BloodRequestRepositoryInterface.php** - Repository Interface
+#### 19. **app/Contracts/BloodRequestRepositoryInterface.php** - Repository Interface
 **Purpose:**
 - Defines contract for blood request data access
 - Enables loose coupling between controller and repository
@@ -319,7 +349,7 @@ Response = what the server sends back
 
 ### Application Repositories
 
-#### 18. **app/Repositories/BloodRequestRepository.php** - Blood Request Repository
+#### 20. **app/Repositories/BloodRequestRepository.php** - Blood Request Repository
 **Purpose:**
 - Implements BloodRequestRepositoryInterface
 - Wraps **Eloquent** `BloodRequest` model static methods
@@ -333,27 +363,26 @@ Response = what the server sends back
 
 ### Configuration Files
 
-#### 19. **routes/web.php** - Route Definitions
+#### 21. **routes/web.php** - Route Definitions
 **Purpose:**
 - Defines all application routes (URL → Controller@Action mappings)
-- Registers both GET and POST routes
+- Registers GET and POST routes with optional **middleware** (3rd argument)
 - Supports dynamic routes with parameters
 
 **Routes:**
-- Auth: register, login, logout
-- Home: index, dashboard
-- Requests: CRUD operations, donor responses, history
+- **Public:** register, login, `/` (no middleware)
+- **Protected (`AuthMiddleware`):** dashboard, all `/requests*`, logout
 
 ---
 
-#### 20. **config/database.php** - Database Credentials
+#### 22. **config/database.php** - Database Credentials
 **Purpose:**
 - Stores database connection configuration (host, port, database, username, password, charset)
 - Read by `EloquentBootstrap::boot()` to configure the ORM
 
 ---
 
-#### 21. **composer.json** - Dependencies
+#### 23. **composer.json** - Dependencies
 **Purpose:**
 - Declares **`illuminate/database`** (^11) — Eloquent ORM without full Laravel
 - PSR-4 autoload for `App\` and `Core\`
@@ -686,15 +715,14 @@ Router::dispatch(Request)
     ├─ [IF closure] → Execute closure
     │
     └─ [IF controller@action] → 
+        ├─ Run middleware pipeline (e.g. AuthMiddleware on protected routes)
+        │  └─ Guest? redirect /login and stop
+        │  └─ OK? call $next($request)
         ├─ Resolve controller via Container
-        │  └─ Container::resolve()
-        │     └─ Instantiate with dependency injection
-        │        └─ Inject BloodRequestRepository (no PDO passed in)
-        │
+        │  └─ Inject BloodRequestRepository
         └─ Call controller action method
             ↓
             └─ [Controller Action]
-                ├─ Auth::requireUser() [if protected]
                 ├─ Validate input
                 ├─ Call repository methods
                 ├─ Query/update database
@@ -727,7 +755,7 @@ Authenticated user creates request
     ↓
 POST /requests → BloodRequestController::store()
     ↓
-├─ Auth::requireUser() [verify login]
+├─ AuthMiddleware [verify login via route]
 ├─ Validate input
 │  ├─ Blood type in allowed list
 │  ├─ City not empty
@@ -796,8 +824,9 @@ A: This is an MVC (Model-View-Controller) architecture with:
 - **Model**: Database models (User, BloodRequest, BloodRequestResponse) and repositories
 - **View**: PHP templates in app/Views rendered by View Engine
 - **Controller**: Three controllers (Auth, Home, BloodRequest) handling business logic
-- **Additional Patterns**: Dependency Injection, Repository Pattern, **ORM (Eloquent)**
+- **Additional Patterns**: Dependency Injection, Repository Pattern, **ORM (Eloquent)**, **Middleware**
 - **Data access**: Eloquent models + repository interface (not raw PDO in application code)
+- **Auth on protected routes**: `AuthMiddleware` in `app/Middleware/` (declared in `routes/web.php`)
 
 ---
 
@@ -984,9 +1013,10 @@ A: Here's what happens step-by-step:
 10. **If password doesn't match:**
     - Show error message
     - Show login form again
-11. On protected pages, `Auth::requireUser()` checks if `$_SESSION['user']` exists
-    - If yes → user is logged in, show the page
-    - If no → user is not logged in, redirect to login
+11. On protected routes, **AuthMiddleware** runs before the controller
+    - Calls `Auth::requireUser()` → checks `$_SESSION['user']`
+    - If yes → controller runs (dashboard, requests, …)
+    - If no → redirect to login
 
 **In simple terms:**
 - App checks username and password
@@ -1584,6 +1614,17 @@ A: **`mbstring`** (`extension=mbstring` in `php.ini`). Illuminate's `Str` class 
 
 ---
 
+**Q47: How does middleware work in this project?**
+A:
+1. Routes in `web.php` pass `[AuthMiddleware::class]` as the 3rd argument on protected URLs.
+2. `Router::dispatch()` runs `runPipeline()` before the controller.
+3. `AuthMiddleware::handle()` calls `Auth::requireUser()` then `$next($request)`.
+4. Controllers no longer call `Auth::requireUser()` — auth is centralized on the route.
+
+**Defense line:** "Middleware is the filter between the router and the controller; our auth middleware matches the course folder structure under `app/Middleware/`."
+
+---
+
 ## Conclusion
 
 This Blood Bank Request Management System demonstrates proper MVC architecture with:
@@ -1592,6 +1633,7 @@ This Blood Bank Request Management System demonstrates proper MVC architecture w
 - ✅ Dependency injection for flexibility
 - ✅ Repository pattern for data abstraction
 - ✅ **Eloquent ORM** for database access (course ORM requirement)
+- ✅ **Middleware** (`MiddlewareInterface`, `AuthMiddleware`) on protected routes
 - ✅ Security best practices (parameterized ORM queries, password hashing)
 - ✅ Type safety with strict types
 - ✅ Session-based authentication

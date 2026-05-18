@@ -136,7 +136,7 @@ Pros: clear request path, PSR-4, parameterized routes, view engine, **Eloquent O
 
 **Authentication?** Session after login; protected actions call `requireUser()`.
 
-**Middleware?** Not used in this MVP; auth is enforced in controllers through `Core\Auth` for a smaller scope. Middleware can be added later around the router.
+**Middleware?** `app/Middleware/AuthMiddleware` runs on protected routes (declared in `routes/web.php`) before the controller. It calls `Core\Auth::requireUser()`. Public routes: `/`, `/login`, `/register`.
 
 **ORM?** **Eloquent** (`illuminate/database` ^11) bootstrapped in `EloquentBootstrap`. Models extend `App\Models\Model`. Repository still wraps blood-request access for DIP.
 

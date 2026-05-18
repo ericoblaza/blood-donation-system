@@ -4,35 +4,41 @@ declare(strict_types=1);
 
 namespace Core\Http;
 
+use App\Middleware\MiddlewareInterface;
 use Core\Container\Container;
 
-// Matches request method + path to a handler; runs controller action or returns 404/500.
+// Matches request method + path to a handler; runs middleware then controller.
 
 class Router
 {
+    /** @var array<string, array<string, array{handler: callable|array, middleware: list<class-string>}> */
     private array $routes = [];
 
     public function __construct(private readonly ?Container $container = null)
     {
     }
 
-    public function get(string $path, callable|array $handler): void
+    /**
+     * @param list<class-string<MiddlewareInterface>> $middleware
+     */
+    public function get(string $path, callable|array $handler, array $middleware = []): void
     {
-        $normalizedPath = $this->normalizePath($path);
-        $this->routes['GET'][$normalizedPath] = $handler;
+        $this->addRoute('GET', $path, $handler, $middleware);
     }
 
-    public function post(string $path, callable|array $handler): void
+    /**
+     * @param list<class-string<MiddlewareInterface>> $middleware
+     */
+    public function post(string $path, callable|array $handler, array $middleware = []): void
     {
-        $normalizedPath = $this->normalizePath($path);
-        $this->routes['POST'][$normalizedPath] = $handler;
+        $this->addRoute('POST', $path, $handler, $middleware);
     }
 
     public function dispatch(Request $request): void
     {
         $method = $request->method();
         $path = $this->normalizePath($request->path());
-        [$handler, $params] = $this->resolve($method, $path);
+        [$handler, $params, $middleware] = $this->resolve($method, $path);
 
         if ($handler === null) {
             http_response_code(404);
@@ -42,6 +48,49 @@ class Router
 
         $request->setRouteParams($params);
 
+        $this->runPipeline($request, $middleware, function (Request $req) use ($handler): void {
+            $this->runHandler($handler, $req);
+        });
+    }
+
+    /**
+     * @param list<class-string<MiddlewareInterface>> $middleware
+     */
+    private function addRoute(string $method, string $path, callable|array $handler, array $middleware): void
+    {
+        $normalizedPath = $this->normalizePath($path);
+        $this->routes[$method][$normalizedPath] = [
+            'handler' => $handler,
+            'middleware' => $middleware,
+        ];
+    }
+
+    /**
+     * @param list<class-string<MiddlewareInterface>> $middleware
+     */
+    private function runPipeline(Request $request, array $middleware, callable $destination): void
+    {
+        $next = $destination;
+
+        foreach (array_reverse($middleware) as $middlewareClass) {
+            $instance = new $middlewareClass();
+            if (!$instance instanceof MiddlewareInterface) {
+                http_response_code(500);
+                echo "Invalid middleware: {$middlewareClass}";
+                return;
+            }
+
+            $previous = $next;
+            $next = static function (Request $req) use ($instance, $previous): void {
+                $instance->handle($req, $previous);
+            };
+        }
+
+        $next($request);
+    }
+
+    private function runHandler(callable|array $handler, Request $request): void
+    {
         if (is_callable($handler)) {
             $handler($request);
             return;
@@ -75,17 +124,21 @@ class Router
     }
 
     /**
-     * @return array{0: callable|array|null, 1: array<string, string>}
+     * @return array{0: callable|array|null, 1: array<string, string>, 2: list<class-string<MiddlewareInterface>>}
      */
     private function resolve(string $method, string $path): array
     {
         $methodRoutes = $this->routes[$method] ?? [];
 
         if (isset($methodRoutes[$path])) {
-            return [$methodRoutes[$path], []];
+            return [
+                $methodRoutes[$path]['handler'],
+                [],
+                $methodRoutes[$path]['middleware'],
+            ];
         }
 
-        foreach ($methodRoutes as $routePath => $handler) {
+        foreach ($methodRoutes as $routePath => $route) {
             if (!str_contains($routePath, '{')) {
                 continue;
             }
@@ -112,10 +165,10 @@ class Router
                 $params[$name] = $matches[$index] ?? '';
             }
 
-            return [$handler, $params];
+            return [$route['handler'], $params, $route['middleware']];
         }
 
-        return [null, []];
+        return [null, [], []];
     }
 
     private function normalizePath(string $path): string
