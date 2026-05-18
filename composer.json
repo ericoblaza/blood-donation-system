@@ -1,0 +1,15 @@
+{
+    "name": "ericoblaza/my-mvc-framework",
+    "description": "Custom PHP MVC framework + blood donation MVP",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "illuminate/database": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Core\\": "core/",
+            "App\\": "app/"
+        }
+    }
+}
