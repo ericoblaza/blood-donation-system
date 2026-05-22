@@ -1,0 +1,14 @@
+---
+description: Never add Cursor commit or PR attribution
+alwaysApply: true
+---
+
+# No Cursor attribution in Git
+
+When creating or amending commits or pull requests for this repository:
+
+- Do **not** add `Co-authored-by: Cursor` or `cursoragent@cursor.com` to commit messages.
+- Do **not** add `Made-with: Cursor` or similar Cursor attribution trailers.
+- Do **not** configure commits to attribute Cursor as a co-author.
+
+Commit messages should only list human authors and describe the change in plain language.
