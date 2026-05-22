@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Core\Http;
 
-// Outgoing HTTP: status code, headers, body, redirects — keeps controllers tidy.
+//handles what the server sends back to the browser
 
 class Response
 {

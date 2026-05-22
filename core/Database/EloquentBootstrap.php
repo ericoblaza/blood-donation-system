@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace Core\Database;
@@ -7,8 +6,8 @@ namespace Core\Database;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use RuntimeException;
 
-final class EloquentBootstrap
-{
+/** Boots Eloquent ORM (illuminate/database) once per request. */
+final class EloquentBootstrap{
     private static bool $booted = false;
 
     public static function boot(): void

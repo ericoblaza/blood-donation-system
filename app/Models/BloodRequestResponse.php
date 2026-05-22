@@ -1,5 +1,5 @@
 <?php
-
+// tracks donor decisions
 declare(strict_types=1);
 
 namespace App\Models;
@@ -13,9 +13,9 @@ class BloodRequestResponse extends Model
 {
     protected $table = 'blood_request_responses';
 
-    public $incrementing = false;
+    public $incrementing = false; // no single auto-increment `id` column
 
-    public const UPDATED_AT = null;
+    public const UPDATED_AT = null; // only created_at, no updated_at
 
     protected $fillable = [
         'request_id',
@@ -52,7 +52,7 @@ class BloodRequestResponse extends Model
             ->where('blood_requests.requester_user_id', $requesterUserId)
             ->orderByDesc('blood_request_responses.created_at')
             ->get()
-            ->map(static fn ($row): array => (array) $row->getAttributes())
+            ->map(static fn (BloodRequestResponse $row): array => $row->getAttributes())
             ->all();
     }
 

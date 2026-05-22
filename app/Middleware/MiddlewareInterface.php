@@ -1,5 +1,5 @@
 <?php
-
+//defines how middleware works in the application
 declare(strict_types=1);
 
 namespace App\Middleware;

@@ -1,4 +1,5 @@
 <?php
+// starting point for table mapping, fillable fields, relationships
 
 declare(strict_types=1);
 

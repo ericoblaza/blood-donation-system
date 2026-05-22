@@ -1,5 +1,9 @@
 <?php
 
+// Controller: "Give me all open blood requests."
+// Repository: (calls BloodRequest model / ORM)
+// Controller: gets data back
+
 declare(strict_types=1);
 
 namespace App\Repositories;

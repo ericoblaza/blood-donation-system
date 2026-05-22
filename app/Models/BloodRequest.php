@@ -25,12 +25,12 @@ class BloodRequest extends Model
         'contact_phone',
     ];
 
-    public function requester(): BelongsTo
+    public function requester(): BelongsTo //// who created the request
     {
         return $this->belongsTo(User::class, 'requester_user_id');
     }
 
-    public function responses(): HasMany
+    public function responses(): HasMany // donor accept/decline rows
     {
         return $this->hasMany(BloodRequestResponse::class, 'request_id');
     }

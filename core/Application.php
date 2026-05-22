@@ -1,6 +1,5 @@
 <?php
-// container configuration
-// Central application configuration and initialization
+// Tells the container how to build objects (database, repositories, controllers)
 
 declare(strict_types=1);
 

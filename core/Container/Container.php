@@ -1,6 +1,6 @@
 <?php
-// Without a container, you would need to write code like this every time: like "create a new PDO" and etc.
-
+// builds objects and wires dependencies automatically
+// If a class needs a repository or database connection, the container supplies it automatically
 namespace Core\Container;
 
 use ReflectionClass;
